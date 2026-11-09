@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Corridor{% endblock %}{% block heading %}Analitik Koridor{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-end gap-3 mb-4"><label class="text-xs text-gray-400">Lokasi
+ <select id="loc" class="block"><option value="">Semua lokasi (parameter default)</option>{% for l in locs %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></label>
+ <label class="text-xs text-gray-400">Video (survei)
+ <select id="job" class="block"><option value="">Semua data</option>{% for j in jobs %}<option value="{{ j.id }}">#{{ j.id }} · {{ j.filename }}</option>{% endfor %}</select></label>
+ <span class="text-xs text-gray-500">Kapasitas dan LOS memakai parameter lokasi (Locations / Parameter). Memilih video memakai lokasi kameranya.</span></div>
+<p id="k-note" class="text-xs text-gray-500 mb-3"></p>
+<p id="k-warn" class="hidden mb-3 px-3 py-2 rounded text-sm bg-red-500/20 text-red-300"></p>
+<div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
+{% for id,l in [('k-hour','Jam puncak'),('k-smp','Volume (smp/jam)'),('k-cap','Kapasitas (smp/jam)'),('k-vc','D_J (derajat kejenuhan)'),('k-los','LOS'),('k-phf','PHF')] %}
+<div class="card p-4"><div class="text-xs text-gray-400">{{ l }}</div><div id="{{ id }}" class="text-2xl font-bold mt-1">–</div></div>{% endfor %}</div>
+<div class="card p-4 mb-4"><h2 class="text-sm text-gray-400 mb-2">Rincian perhitungan PKJI 2023</h2><p id="k-detail" class="text-xs text-gray-300 leading-relaxed">–</p></div>
+<div class="card p-4 mb-4"><h2 class="text-sm text-gray-400 mb-3">Heatmap Volume (hari × jam)</h2><div class="overflow-x-auto"><div id="heat" class="min-w-[720px]"></div></div></div>
+<div class="card p-4"><h2 class="text-sm text-gray-400 mb-2">Distribusi Kecepatan (km/jam)</h2><canvas id="hist" height="90"></canvas></div>
+{% endblock %}
+{% block scripts %}<script>
+Chart.defaults.font.family='"Barlow", system-ui, sans-serif';Chart.defaults.color='#47515B';
+const $=i=>document.getElementById(i);let hc;
+async function load(){const qs=new URLSearchParams();if($('loc').value)qs.set('location_id',$('loc').value);if($('job').value)qs.set('job_id',$('job').value);
+ const d=await (await fetch('/api/v1/corridor?'+qs)).json();const p=d.peak||{};
+ $('k-note').textContent=p.observed_min&&p.observed_min<60?`Data jam puncak hanya mencakup ±${p.observed_min} menit: volume diekstrapolasi ke per jam (kasar) dan PHF tidak dihitung. Gunakan rekaman ≥ 1 jam untuk hasil resmi.`:'';
+ $('k-hour').textContent=p.hour?p.hour.slice(5)+':00':'–';$('k-smp').textContent=p.smp_jam??'–';$('k-cap').textContent=p.capacity??'–';$('k-vc').textContent=p.dj??'–';$('k-vc').className='text-2xl font-bold mt-1'+(p.dj>0.85?' text-red-400':'');
+ const w=$('k-warn');if(p.dj>0.85){w.textContent='D_J '+p.dj+' > 0,85: ruas jenuh / tidak laik, perlu rekayasa lalu lintas.';w.classList.remove('hidden')}else w.classList.add('hidden');
+ const pa=p.per_arah?'<b>Per arah (jalan terbagi):</b> '+Object.entries(p.per_arah).map(([k,r])=>`<span class="${r.dj>0.85?'text-red-400':''}">Arah ${k}: ${r.smp_jam} smp/jam ÷ ${r.capacity} = D_J ${r.dj}, LOS ${r.los}</span>`).join(' · ')+(p.arah?` (ditampilkan: arah terburuk = Arah ${p.arah})`:'')+'<br>':'';const dt=p.detail;$('k-detail').innerHTML=dt?pa+`Tipe jalan ${dt.road_type} · Q = ${dt.q_total} kend/jam · baris emp: ${dt.baris_emp}<br>emp: ${Object.entries(dt.emp).map(([k,v])=>k+'='+v).join(', ')}<br>smp: ${Object.entries(dt.smp_per_kelas).map(([k,v])=>k+'='+v).join(', ')} → ${p.smp_jam} smp/jam<br>C = ${dt.faktor.C0}${dt.faktor.n_lajur>1?' × '+dt.faktor.n_lajur+' lajur':''} × F_CLJ ${dt.faktor.F_CLJ} × F_CPA ${dt.faktor.F_CPA} × F_CHS ${dt.faktor.F_CHS} (${dt.faktor.catatan_F_CHS}) × F_CUK ${dt.faktor.F_CUK} = ${p.capacity} smp/jam`:'';$('k-los').textContent=p.los??'–';$('k-phf').textContent=p.phf??'–';
+ const D=['Min','Sen','Sel','Rab','Kam','Jum','Sab'],mx=Math.max(...d.heat.map(x=>x.n),1),g={};d.heat.forEach(x=>g[x.d+'-'+x.h]=x.n);
+ let h='<div class="grid gap-px" style="grid-template-columns:40px repeat(24,1fr)"><div></div>'+[...Array(24)].map((_,i)=>`<div class="text-[10px] text-center text-gray-500">${i}</div>`).join('');
+ D.forEach((n,di)=>{h+=`<div class="text-xs text-gray-400">${n}</div>`;for(let i=0;i<24;i++){const v=g[di+'-'+i]||0;h+=`<div title="${n} ${i}:00 — ${v}" class="h-6 rounded-sm" style="background:rgba(42,91,136,${.05+.95*v/mx})"></div>`}});
+ $('heat').innerHTML=h+'</div>';
+ if(!hc)hc=new Chart($('hist'),{type:'bar',data:{labels:[],datasets:[{data:[],backgroundColor:'#2A5B88'}]},options:{scales:{y:{grid:{color:'#E3E7E9'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+ hc.data.labels=d.hist.labels;hc.data.datasets[0].data=d.hist.data;hc.update();}
+$('loc').onchange=load;$('job').onchange=load;load();
+</script>{% endblock %}

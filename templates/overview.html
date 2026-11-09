@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Overview{% endblock %}{% block heading %}Overview Koridor{% endblock %}
+{% block content %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+{% for id,l in [('m-total','Kendaraan (24 jam)'),('m-speed','Rata-rata km/jam'),('m-vio','Pelanggaran Kecepatan'),('m-wl','Hit Watchlist')] %}
+<div class="card p-4"><div class="text-xs text-gray-400">{{l}}</div><div id="{{id}}" class="text-3xl font-bold mt-1 {{ 'text-red-400' if id=='m-wl' else '' }}">–</div></div>{% endfor %}</div>
+<div class="grid lg:grid-cols-3 gap-4 mb-5">
+ <div class="card p-4 lg:col-span-2"><h2 class="text-sm text-gray-400 mb-2">Flow & Kecepatan (12 jam terakhir)</h2><canvas id="flow" height="120"></canvas></div>
+ <div class="card p-4"><h2 class="text-sm text-gray-400 mb-2">Komposisi Kelas PKJI (semua data)</h2><canvas id="mix"></canvas></div></div>
+<div class="card overflow-x-auto"><h2 class="text-sm text-gray-400 p-4 pb-0">Enforcement Events Terbaru</h2>
+<table class="w-full text-sm"><thead><tr><th>Waktu</th><th>Kamera</th><th>Plat</th><th>Kelas</th><th>Km/jam</th><th>Status</th></tr></thead><tbody id="ev"></tbody></table></div>
+{% endblock %}
+{% block scripts %}<script>const PK={{pkji|tojson}};</script><script src="/static/js/dashboard.js"></script>{% endblock %}

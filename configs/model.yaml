@@ -1,0 +1,11 @@
+# Bobot dicoba berurutan (relatif ke root proyek).
+#  1) yolo11_pkji.pt = hasil training sendiri (kelas SM,MP,KS,LB,LT; nama lama KB/BB otomatis dipetakan ke LT/LB)  <- paling akurat
+#  2) yolo11s.pt     = YOLO11 COCO pra-latih, dipetakan ke PKJI lewat coco_map (KS tidak terbedakan)
+weights: [yolo11_pkji.pt, yolo11s.pt]
+imgsz: 960          # naikkan ke 1280 bila kendaraan kecil/jauh (lebih lambat)
+conf: 0.35
+iou: 0.5
+device: auto        # auto | cpu | 0 (GPU pertama)
+half: true          # FP16 otomatis hanya jika CUDA
+coco_map: {motorcycle: SM, car: MP, bus: LB, truck: LT}
+plate: {every: 4, max_tries: 10, min_vehicle_width: 60}   # OCR tiap N frame per kendaraan, maks percobaan, lebar min (px)

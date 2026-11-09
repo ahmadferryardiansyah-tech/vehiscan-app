@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Watchlist{% endblock %}{% block heading %}Watchlist DPO & Tunggakan Pajak{% endblock %}
+{% block content %}
+<datalist id="reasons"><option value="DPO - Pencurian Kendaraan"><option value="DPO - Kasus Lain"><option value="Tunggakan Pajak 1 Tahun"><option value="Tunggakan Pajak 2 Tahun"></datalist>
+<form method="post" action="/watchlist" class="card p-4 flex flex-wrap gap-3 items-end mb-4">
+ <label class="text-xs text-gray-400">Plat target<input name="plate" required placeholder="AB 1234 XY" class="block"></label>
+ <label class="text-xs text-gray-400 flex-1 min-w-[220px]">Alasan<input name="reason" list="reasons" required placeholder="pilih saran atau ketik sendiri" class="block w-full"></label>
+ <button class="btn">Tambah</button></form>
+<div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr><th>Plat</th><th>Alasan</th><th>Ditambahkan</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="font-mono">{{ r.plate }}</td><td>{{ r.reason }}</td><td>{{ r.added }}</td>
+<td class="whitespace-nowrap space-x-3"><button type="button" class="text-brand text-sm" data-row='{{ r|tojson }}' onclick="openEdit(this)">Ubah</button>
+<form method="post" action="/watchlist/{{ r.id }}/delete" class="inline" onsubmit="return confirm('Hapus plat ini dari watchlist?')"><button class="text-red-400 text-sm">Hapus</button></form></td></tr>
+{% else %}<tr><td colspan="4" class="text-gray-500">Belum ada target.</td></tr>{% endfor %}</tbody></table></div>
+<dialog id="dlg"><form method="post" data-base="/watchlist/" data-suffix="/edit" class="p-5 space-y-3"><h2 class="text-lg">Ubah target</h2>
+ <label class="text-xs text-gray-400 block">Plat<input name="plate" required class="w-full"></label>
+ <label class="text-xs text-gray-400 block">Alasan<input name="reason" list="reasons" required class="w-full"></label>
+ <div class="flex justify-end gap-2 pt-2"><button type="button" class="btn btn-o" onclick="this.closest('dialog').close()">Batal</button><button class="btn">Simpan</button></div></form></dialog>
+{% endblock %}

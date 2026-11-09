@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% block title %}Calibration{% endblock %}{% block heading %}Kalibrasi Kamera{% endblock %}
+{% block content %}
+<div class="grid xl:grid-cols-3 gap-4">
+<div class="xl:col-span-2 space-y-3">
+ <div class="card p-3 flex flex-wrap gap-2 items-end text-xs text-gray-400">
+  <label>Kamera<select id="cam" class="block">{% for c in cams %}<option value="{{c.id}}">{{c.id}} · {{c.name}}</option>{% endfor %}</select></label>
+  <label>Gambar/video<input type="file" id="file" accept="image/*,video/*" class="block"></label>
+  <label>Detik ke-<input id="t" type="number" min="0" value="0" step="0.5" class="block w-20"></label>
+  <button class="btn btn-o" onclick="fromFile()">Ambil frame</button>
+  <label>Video terunggah<select id="job" class="block"><option value="">–</option>{% for j in jobs %}<option value="{{j.id}}">{{j.filename}}</option>{% endfor %}</select></label>
+  <button class="btn btn-o" onclick="fromJob()">Pakai</button>
+  <button class="btn btn-o" onclick="fromCam()">Snapshot kamera</button></div>
+ <div class="card p-2"><canvas id="cv" class="w-full cursor-crosshair bg-black" width="960" height="540"></canvas></div>
+ <div id="msg" class="text-sm text-gray-400">Pilih sumber frame di atas.</div></div>
+<div class="space-y-3">
+ <div class="card p-4 text-sm"><h2 class="text-gray-400 text-sm mb-2">Langkah</h2><ol class="list-decimal pl-5 space-y-1 text-gray-300">
+  <li>Ambil satu frame jalan.</li><li>Klik <b>4 titik</b> segiempat di permukaan jalan yang panjang & lebarnya Anda ketahui (mis. marka): <b>1 kiri-atas → 2 kanan-atas → 3 kanan-bawah → 4 kiri-bawah</b>. Titik bisa digeser.</li>
+  <li>Isi lebar & panjang asli (meter), serta posisi garis A dan B terhadap tepi atas (0..L).</li><li>(Opsional) Mode ROI: klik poligon area jalan agar objek lain diabaikan.</li><li>Simpan.</li></ol></div>
+ <div class="card p-4 grid grid-cols-2 gap-3 text-xs text-gray-400">
+  <label>Lebar area (m)<input id="W" type="number" step="0.1" value="7" class="w-full"></label><label>Panjang area (m)<input id="L" type="number" step="0.1" value="30" class="w-full"></label>
+  <label>Garis A (m)<input id="A" type="number" step="0.1" value="5" class="w-full"></label><label>Garis B (m)<input id="B" type="number" step="0.1" value="25" class="w-full"></label>
+  <div class="col-span-2 flex gap-2 flex-wrap"><button class="btn btn-o" id="bm" onclick="setMode()">Mode: Titik kalibrasi</button><button class="btn btn-o" onclick="undo()">Undo</button><button class="btn btn-o" onclick="resetAll()">Reset</button></div></div>
+ <div id="info" class="card p-4 text-sm text-gray-300">Belum ada hasil.</div>
+ <button class="btn w-full" onclick="save()">Simpan kalibrasi</button></div></div>
+{% endblock %}
+{% block scripts %}<script>
+const CAL={{cal|tojson}},$=i=>document.getElementById(i),cv=$('cv'),cx=cv.getContext('2d');
+let img=null,fw=0,fh=0,pts=[],roi=[],mode='pts',geo=null,drag=-1,tm;
+const say=t=>$('msg').textContent=t;
+async function post(url,body,json=true){const r=await fetch(url,{method:'POST',headers:json?{'Content-Type':'application/json'}:{},body:json?JSON.stringify(body):body});return r}
+function setFrame(d){const im=new Image();im.onload=()=>{img=im;fw=d.w;fh=d.h;cv.width=fw;cv.height=fh;pts=[];roi=[];geo=null;
+ const c=CAL[$('cam').value];if(c&&c.frame&&c.frame[0]==fw&&c.frame[1]==fh){pts=c.src.map(p=>[...p]);const full=c.roi.length==4&&c.roi.some(p=>p[0]>=fw-1&&p[1]>=fh-1);roi=full?[]:c.roi.map(p=>[...p]);
+  $('W').value=c.width_m;$('L').value=c.length_m;$('A').value=c.line_a;$('B').value=c.line_b;say(`Kalibrasi tersimpan dimuat (${fw}×${fh}).`)}else say(`Frame ${fw}×${fh}. Klik 4 titik.`);
+ preview();draw()};im.src=d.image}
+async function getFrame(r){if(!r.ok){say((await r.json()).detail||'Gagal');return}setFrame(await r.json())}
+function fromFile(){const f=$('file').files[0];if(!f){say('Pilih file dulu');return}const fd=new FormData();fd.append('file',f);fd.append('t',$('t').value);post('/api/v1/calibration/frame',fd,false).then(getFrame)}
+function fromJob(){if(!$('job').value){say('Pilih video');return}const fd=new FormData();fd.append('job_id',$('job').value);fd.append('t',$('t').value);post('/api/v1/calibration/frame',fd,false).then(getFrame)}
+function fromCam(){fetch('/api/v1/calibration/snapshot/'+$('cam').value).then(getFrame)}
+function body(){return{src:pts,width:+$('W').value,length:+$('L').value,line_a:+$('A').value,line_b:+$('B').value}}
+function preview(){clearTimeout(tm);tm=setTimeout(async()=>{if(pts.length!=4){geo=null;$('info').textContent='Tempatkan 4 titik.';draw();return}
+ geo=await (await post('/api/v1/calibration/preview',body())).json();const i=$('info');
+ if(!geo.ok){i.innerHTML=`<span class="text-red-300">${geo.error}</span>`}else{const f=geo.ppm_far,ck=(v,n)=>`<span class="${f>=v?'text-emerald-400':'text-amber-300'}">${n} (≥${v}): ${f>=v?'OK':'kurang'}</span>`;
+ i.innerHTML=`Jarak A–B: <b>${geo.dist} m</b><br>PPM tepi jauh: <b>${f}</b> · tepi dekat: <b>${geo.ppm_near}</b><br>${ck(67,'Deteksi')}<br>${ck(107,'Klasifikasi')}<br>${ck(325,'Plat')}`}draw()},180)}
+function draw(){if(!img)return;cx.drawImage(img,0,0);const lw=Math.max(2,fw/450),R=lw*3.5;cx.lineWidth=lw;
+ if(roi.length){cx.beginPath();roi.forEach((p,i)=>i?cx.lineTo(...p):cx.moveTo(...p));cx.closePath();cx.fillStyle='rgba(16,185,129,.15)';cx.fill();cx.strokeStyle='#10b981';cx.stroke();roi.forEach(p=>{cx.beginPath();cx.arc(p[0],p[1],R*.7,0,7);cx.fillStyle='#10b981';cx.fill()})}
+ if(pts.length){cx.beginPath();pts.forEach((p,i)=>i?cx.lineTo(...p):cx.moveTo(...p));if(pts.length==4)cx.closePath();cx.strokeStyle='#22d3ee';cx.stroke();
+  pts.forEach((p,i)=>{cx.beginPath();cx.arc(p[0],p[1],R,0,7);cx.fillStyle='#22d3ee';cx.fill();cx.fillStyle='#000';cx.font=`bold ${R*1.6}px sans-serif`;cx.textAlign='center';cx.fillText(i+1,p[0],p[1]+R*.55)})}
+ if(geo&&geo.ok)[['a','#f59e0b','A'],['b','#ef4444','B']].forEach(([k,c,n])=>{const l=geo[k];cx.beginPath();cx.moveTo(...l[0]);cx.lineTo(...l[1]);cx.strokeStyle=c;cx.lineWidth=lw*1.5;cx.stroke();cx.fillStyle=c;cx.font=`bold ${R*2}px sans-serif`;cx.textAlign='left';cx.fillText(n,l[1][0]+R,l[1][1])})}
+function P(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]}
+cv.onmousedown=e=>{if(!img)return;const [x,y]=P(e),L=mode=='pts'?pts:roi,tol=fw/45;drag=L.findIndex(p=>Math.hypot(p[0]-x,p[1]-y)<tol);
+ if(drag<0&&(mode=='roi'||pts.length<4)){L.push([x,y]);drag=L.length-1}draw();preview()};
+cv.onmousemove=e=>{if(drag<0)return;const [x,y]=P(e),L=mode=='pts'?pts:roi;L[drag]=[x,y];draw();preview()};
+window.onmouseup=()=>drag=-1;
+function setMode(){mode=mode=='pts'?'roi':'pts';$('bm').textContent='Mode: '+(mode=='pts'?'Titik kalibrasi':'ROI (poligon)')}
+function undo(){(mode=='pts'?pts:roi).pop();draw();preview()}
+function resetAll(){pts=[];roi=[];geo=null;draw();preview()}
+async function save(){if(!img){say('Ambil frame dulu');return}const r=await post('/api/v1/calibration/save',{...body(),camera_id:+$('cam').value,frame:[fw,fh],roi});
+ say(r.ok?`Tersimpan untuk kamera ${$('cam').value}. Langsung dipakai tanpa restart.`:(await r.json()).detail)}
+</script>{% endblock %}

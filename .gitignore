@@ -1,0 +1,15 @@
+# Python Environment & Cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+
+# Ignore file video besar agar tidak terkena limit 100MB dari GitHub
+uploads/*
+!uploads/.gitkeep
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Cache training & runs
+runs/

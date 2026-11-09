@@ -1,0 +1,26 @@
+=== VehiScan: diagnosa sistem ===
+Python 3.12.10 | Windows 11 | folder: C:\ProyekAplikom02
+[OK]     Versi Python (disarankan 3.11 atau 3.12)  ->  3.12   (0.0 dtk)
+[OK]     Paket Python terpasang  ->  fastapi 0.162.2, uvicorn 0.54.0, opencv-python-headless 5.0.0.93, numpy 2.5.4, PyYAML 6.0.3, torch 2.15.0, ultralytics 8.4.208, rapidocr-onnxruntime 1.4.4, imageio-ffmpeg 0.8.1, openpyxl 3.1.5, reportlab 5.1.0   (9.8 dtk)
+[OK]     PyTorch dan GPU  ->  torch 2.15.0+cpu; tanpa GPU CUDA (CPU, pemrosesan video akan lambat)   (0.0 dtk)
+[GAGAL]  Paket pelacak ByteTrack (lap / lapx)
+         RuntimeError: tidak ada. Jalankan: python -m pip install lapx  (ultralytics mencoba memasangnya sendiri saat pertama melacak, butuh internet)
+[OK]     Folder data/ bisa ditulis  ->  C:\ProyekAplikom02\data   (0.0 dtk)
+[LEWAT]  Database dan job terakhir  ->  belum ada database (server belum pernah dijalankan)
+[GAGAL]  Kalibrasi kamera (configs/calibration.json)
+         FileNotFoundError: [Errno 2] No such file or directory: 'C:\\ProyekAplikom02\\configs\\calibration.json'
+[OK]     Berkas bobot YOLO  ->  yolo11s.pt   (0.0 dtk)
+[GAGAL]  Muat model YOLO11
+         RuntimeError: AI Engine belum aktif: no such table: settings
+[GAGAL]  Deteksi + pelacakan pada frame uji (ukur kecepatan komputer)
+         AttributeError: 'NoneType' object has no attribute 'track'
+[OK]     Pembaca plat (OCR)  ->  terbaca 'AB 1234 XY' (skor 0.98)   (2.1 dtk)
+[OK]     ffmpeg dan pembuatan video replay H.264  ->  ffmpeg-win-x86_64-v9.0.2.exe; file 5 KB, 45 frame terbaca kembali   (3.0 dtk)
+[LEWAT]  Alur lengkap: video -> deteksi -> kecepatan -> plat -> replay  ->  butuh kamera terkalibrasi
+
+=== RINGKASAN ===
+7 lolos, 4 gagal, 2 dilewati
+  - perbaiki: Paket pelacak ByteTrack (lap / lapx)
+  - perbaiki: Kalibrasi kamera (configs/calibration.json)
+  - perbaiki: Muat model YOLO11
+  - perbaiki: Deteksi + pelacakan pada frame uji (ukur kecepatan komputer)

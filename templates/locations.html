@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Locations{% endblock %}{% block heading %}Lokasi & Zona{% endblock %}
+{% block content %}
+{% macro fields() %}
+<div class="grid sm:grid-cols-2 gap-3">
+ <label class="text-xs text-gray-400">Nama lokasi<input name="name" required class="w-full"></label>
+ <label class="text-xs text-gray-400">Zona<input name="zone" class="w-full"></label>
+ <label class="text-xs text-gray-400">Jumlah lajur<input name="lanes" type="number" min="1" max="12" value="2" class="w-full"></label>
+ <label class="text-xs text-gray-400">Tipe jalan<select name="road_type" class="w-full">{% for t in road_types %}<option>{{t}}</option>{% endfor %}</select></label>
+ <label class="text-xs text-gray-400">Batas kecepatan (km/jam)<input name="speed_limit" type="number" step="any" placeholder="global {{ '%g' % D.speed_limit }}" class="w-full"></label>
+ <label class="text-xs text-gray-400">Keterangan<input name="note" placeholder="arah, patokan lokasi, dsb." class="w-full"></label></div>
+<details class="mt-3"><summary class="text-sm text-gray-300">Parameter kapasitas khusus lokasi (opsional)</summary>
+ <p class="text-xs text-gray-500 my-2">Kosongkan untuk memakai nilai default dari halaman Parameter. C0 mengikuti tipe jalan; emp otomatis dinamis. Tipe 4/2-T dan 6/2-T dianalisis per arah.</p>
+ <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <label class="text-xs text-gray-400">Lebar lajur (m)<input name="lane_w" type="number" step="any" placeholder="{{ '%g' % D.lane_width }}" class="w-full"></label>
+  <label class="text-xs text-gray-400">Pemisahan arah<select name="split" class="w-full"><option value="">default {{ D.split }}</option>{% for x in ['50-50','60-40','70-30'] %}<option>{{ x }}</option>{% endfor %}</select></label>
+  <label class="text-xs text-gray-400">Ukuran kota (juta jiwa)<input name="pop" type="number" step="any" placeholder="{{ '%g' % D.city_pop }}" class="w-full"></label>
+  <label class="text-xs text-gray-400">KHS<select name="khs" class="w-full"><option value="">default {{ D.khs }}</option>{% for x in ['VLO','LO','MD','HI','VHI'] %}<option>{{ x }}</option>{% endfor %}</select></label>
+  <label class="text-xs text-gray-400">Lebar bahu efektif (m)<select name="lbe" class="w-full"><option value="">default {{ D.lbe }}</option>{% for x in ['0.5','1.0','1.5','2.0'] %}<option>{{ x }}</option>{% endfor %}</select></label>
+  <label class="text-xs text-gray-400">F_CHS manual (0 = otomatis)<input name="f_chs" type="number" step="any" placeholder="{{ '%g' % D.f_chs }}" class="w-full"></label></div></details>
+{% endmacro %}
+<form method="post" action="/locations" class="card p-4 mb-4 max-w-4xl"><h2 class="text-sm text-gray-400 mb-3">Tambah lokasi</h2>{{ fields() }}<div class="mt-3"><button class="btn">Tambah lokasi</button></div></form>
+<div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr><th>Lokasi</th><th>Zona</th><th>Lajur</th><th>Tipe jalan</th><th>Batas km/jam</th><th>Kapasitas</th><th>Kamera</th><th></th></tr></thead><tbody>
+{% for r in rows %}{% set custom = r.lane_w is not none or r.split is not none or r.pop is not none or r.f_chs is not none or r.khs is not none or r.lbe is not none %}
+<tr><td><b>{{ r.name }}</b>{% if r.note %}<div class="text-xs text-gray-500">{{ r.note }}</div>{% endif %}</td><td>{{ r.zone }}</td><td>{{ r.lanes }}</td><td>{{ r.road_type }}</td>
+<td>{{ r.speed_limit if r.speed_limit is not none else 'global ' ~ ('%g' % D.speed_limit) }}</td><td>{{ 'khusus' if custom else 'default' }}</td><td>{{ r.n_cam }}</td>
+<td class="whitespace-nowrap space-x-3"><button type="button" class="text-brand text-sm" data-row='{{ r|tojson }}' onclick="openEdit(this)">Ubah</button>
+<form method="post" action="/locations/{{ r.id }}/delete" class="inline" onsubmit="return confirm('Hapus lokasi ini?')"><button class="text-red-400 text-sm">Hapus</button></form></td></tr>
+{% else %}<tr><td colspan="8" class="text-gray-500">Belum ada lokasi.</td></tr>{% endfor %}</tbody></table></div>
+<dialog id="dlg"><form method="post" data-base="/locations/" data-suffix="/edit" class="p-5 space-y-3"><h2 class="text-lg">Ubah lokasi</h2>{{ fields() }}
+ <div class="flex justify-end gap-2 pt-2"><button type="button" class="btn btn-o" onclick="this.closest('dialog').close()">Batal</button><button class="btn">Simpan</button></div></form></dialog>
+{% endblock %}

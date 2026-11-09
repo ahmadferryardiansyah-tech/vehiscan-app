@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}Settings{% endblock %}{% block heading %}Pengaturan Sistem{% endblock %}
+{% block content %}{% if saved %}<div class="mb-3 text-sm text-emerald-300">Berhasil.</div>{% endif %}
+<div class="card p-4 mb-4 max-w-3xl flex justify-between items-center gap-4"><div><h2 class="text-sm text-gray-400">AI Engine</h2>
+ <div class="text-sm mt-1 {{ 'text-emerald-400' if engine.ready else 'text-amber-300' }}">{{engine.msg}}</div></div>
+ <form method="post" action="/settings/reload-ai"><button class="btn">Reload AI Engine</button></form></div>
+<div class="card p-4 mb-4 max-w-3xl"><div class="flex justify-between items-center gap-4 flex-wrap"><div><h2 class="text-sm text-gray-400">ANPR (pembaca plat)</h2>
+ <div class="text-sm mt-1 {{ 'text-emerald-400' if anpr.ready else 'text-amber-300' }}">{{anpr.msg}}</div></div>
+ <div class="flex items-center gap-2"><input type="file" id="anprf" accept="image/*" class="text-xs"><button type="button" class="btn btn-o" onclick="testAnpr()">Uji plat</button></div></div>
+ <div id="anprres" class="text-sm mt-2 font-mono text-gray-300"></div></div>
+<div class="card p-4 mb-4 max-w-3xl flex justify-between items-center gap-4"><div><h2 class="text-sm text-gray-400">Data</h2>
+ <div class="text-sm mt-1">Simulasi: {{has_demo.get('demo',0)}} baris · Nyata / hasil video: {{ has_demo.values()|sum - has_demo.get('demo',0) }} baris</div></div>
+ <form method="post" action="/settings/clear-demo" onsubmit="return confirm('Hapus semua data simulasi? Data nyata & hasil analisis video tidak terpengaruh.')"><button class="btn btn-o">Hapus data simulasi</button></form></div>
+<div class="card p-4 max-w-3xl flex justify-between items-center gap-4"><div><h2 class="text-sm text-gray-400">Parameter</h2>
+ <div class="text-sm mt-1">Batas kecepatan, kelas & faktor PKJI, pengaturan deteksi, pelacakan, dan ANPR diatur di halaman Parameter.</div></div><a class="btn" href="/parameters">Buka Parameter</a></div>
+{% endblock %}
+
+{% block scripts %}<script>
+async function testAnpr(){const f=document.getElementById('anprf').files[0],o=document.getElementById('anprres');if(!f){o.textContent='Pilih gambar dulu';return}
+ o.textContent='Memproses…';const fd=new FormData();fd.append('file',f);const r=await (await fetch('/api/v1/anpr/test',{method:'POST',body:fd})).json();
+ o.textContent=!r.ok?r.error:(r.plate?`Plat: ${r.plate} (skor ${r.score})`:'Plat tidak terbaca');}
+</script>{% endblock %}

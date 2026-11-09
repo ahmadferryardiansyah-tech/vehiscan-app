@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}Cameras{% endblock %}{% block heading %}Kamera & Sumber Video{% endblock %}
+{% block content %}
+{% macro fields() %}
+<div class="grid sm:grid-cols-2 gap-3">
+ <label class="text-xs text-gray-400">Nama kamera<input name="name" required class="w-full"></label>
+ <label class="text-xs text-gray-400">Lokasi<select name="location_id" class="w-full">{% for l in locs %}<option value="{{ l.id }}">{{ l.name }}</option>{% endfor %}</select></label>
+ <label class="text-xs text-gray-400 sm:col-span-2">Sumber RTSP (opsional, hanya untuk Snapshot di Calibration)<input name="rtsp" placeholder="rtsp://… (kosongkan bila hanya menganalisis file video)" class="w-full font-mono"></label>
+ <label class="text-xs text-gray-400">Arah lalu lintas<input name="direction" placeholder="mis. Utara → Selatan" class="w-full"></label>
+ <label class="text-xs text-gray-400">Keterangan<input name="note" placeholder="posisi, ketinggian, catatan pasang" class="w-full"></label></div>
+{% endmacro %}
+{% if not locs %}<div class="notice bad">Belum ada lokasi. Tambahkan dulu di menu <a class="underline" href="/locations">Locations</a>.</div>{% endif %}
+<form method="post" action="/cameras" class="card p-4 mb-4 max-w-4xl"><h2 class="text-sm text-gray-400 mb-3">Tambah kamera</h2>{{ fields() }}<div class="mt-3"><button class="btn">Tambah kamera</button></div></form>
+<div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr><th>Kamera</th><th>Lokasi</th><th>Sumber</th><th>Kalibrasi</th><th>Status</th><th></th></tr></thead><tbody>
+{% for c in rows %}<tr><td><b>{{ c.name }}</b>{% if c.direction or c.note %}<div class="text-xs text-gray-500">{{ c.direction }}{{ ' · ' if c.direction and c.note }}{{ c.note }}</div>{% endif %}</td><td>{{ c.loc }}</td>
+<td class="font-mono text-xs">{{ c.rtsp }}</td>
+<td>{% if c.calibrated %}<span class="text-emerald-400 text-sm">Terkalibrasi</span>{% else %}<a class="text-red-300 text-sm underline" href="/calibration">Belum</a>{% endif %}</td>
+<td class="{{ 'text-emerald-400' if c.active else 'text-gray-500' }}">{{ 'Aktif' if c.active else 'Nonaktif' }}</td>
+<td class="whitespace-nowrap space-x-3"><span><button type="button" class="text-brand text-sm" onclick="testCam({{ c.id }}, this)">Tes</button><span class="text-xs ml-1"></span></span>
+<button type="button" class="text-brand text-sm" data-row='{{ c|tojson }}' onclick="openEdit(this)">Ubah</button>
+<form method="post" action="/cameras/{{ c.id }}/toggle" class="inline"><button class="text-brand text-sm">{{ 'Nonaktifkan' if c.active else 'Aktifkan' }}</button></form>
+<form method="post" action="/cameras/{{ c.id }}/delete" class="inline" onsubmit="return confirm('Hapus kamera ini beserta kalibrasinya? Riwayat deteksi tetap tersimpan.')"><button class="text-red-400 text-sm">Hapus</button></form></td></tr>
+{% else %}<tr><td colspan="6" class="text-gray-500">Belum ada kamera.</td></tr>{% endfor %}</tbody></table></div>
+<p class="text-xs text-gray-500 mt-3">Standar pemasangan: CBR, matikan H.264+/H.265+, tarik stream langsung dari kamera (bukan NVR), VLAN terisolasi. Mengganti nama kamera ikut memperbarui riwayat deteksinya.</p>
+<dialog id="dlg"><form method="post" data-base="/cameras/" data-suffix="/edit" class="p-5 space-y-3"><h2 class="text-lg">Ubah kamera</h2>{{ fields() }}
+ <div class="flex justify-end gap-2 pt-2"><button type="button" class="btn btn-o" onclick="this.closest('dialog').close()">Batal</button><button class="btn">Simpan</button></div></form></dialog>
+{% endblock %}

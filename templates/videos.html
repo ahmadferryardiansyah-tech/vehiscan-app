@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% block title %}Video Analysis{% endblock %}{% block heading %}Analisis Video (MP4){% endblock %}
+{% block content %}
+{% if not engine.ready %}<div class="mb-4 text-sm text-amber-300 card p-3">⚠ {{engine.msg}}. Video tetap bisa diunggah, tetapi analisis baru berjalan setelah model YOLO dimuat (Settings → Reload AI Engine).</div>{% endif %}
+{% if err %}<div class="mb-4 text-sm text-red-300 card p-3">{{err}}</div>{% endif %}
+<div class="grid lg:grid-cols-2 gap-4 mb-5">
+<form method="post" action="/videos/upload" enctype="multipart/form-data" class="card p-4 space-y-3">
+ <h2 class="text-sm text-gray-400">Unggah video</h2>
+ <input type="file" name="file" accept=".mp4,.mov,.avi,.mkv,video/*" required class="w-full">
+ <label class="text-xs text-gray-400 block">Kamera / kalibrasi yang dipakai<select name="camera_id" class="w-full">{% for c in cams %}<option value="{{c.id}}">{{c.id}} · {{c.name}}</option>{% endfor %}</select></label>
+ <label class="text-xs text-gray-400 block">Waktu mulai rekaman (untuk stempel waktu log)<input type="datetime-local" name="started" step="1" class="w-full"></label>
+ <label class="text-xs text-gray-400 block">Proses setiap N frame (lebih besar = lebih cepat, kurang akurat)<select name="stride" class="w-full"><option>1</option><option>2</option><option>3</option></select></label>
+ <button class="btn">Unggah & Analisis</button></form>
+<div class="card p-4 text-sm"><h2 class="text-sm text-gray-400 mb-2">Spesifikasi video (acuan ARSA-CVS-001)</h2>
+<ul class="space-y-1 text-gray-300 list-disc pl-5">
+<li>Format MP4 (H.264); MOV/AVI/MKV juga diterima.</li>
+<li>Kamera <b>statis</b> (tanpa pan/zoom), posisi sama dengan saat kalibrasi.</li>
+<li>Resolusi ≥ 1920×1080 (2 MP); minimum 1280×720.</li>
+<li>FPS ≥ 25 (stabil, bukan variabel).</li>
+<li>Bitrate konstan; acuan 2 MP ≈ 2,5 Mbps, 4 MP ≈ 4,4 Mbps, 8 MP ≈ 8,8 Mbps. Matikan H.264+/H.265+/Zipstream.</li>
+<li>Kepadatan piksel: deteksi ≥ 67 PPM, klasifikasi ≥ 107 PPM, plat ≥ 325 PPM; tilt kamera 10°–25°.</li>
+<li>Pencahayaan cukup (≥ 20 lux untuk klasifikasi; malam pakai IR untuk plat).</li>
+<li>Kalibrasi kamera terkait harus ada di <code>configs/calibration.json</code>.</li></ul></div></div>
+<div class="card p-4 mb-5">
+ <div class="flex justify-between items-center flex-wrap gap-2 mb-2"><h2 class="text-sm text-gray-400">Pratinjau deteksi <span id="pvt" class="text-gray-500"></span></h2>
+  <span class="text-xs text-gray-500">Garis oranye = A · merah = B · kotak hijau = baru tercatat</span></div>
+ <img id="pv" class="w-full max-w-4xl bg-black rounded hidden" alt="pratinjau">
+ <div id="rbox" class="hidden max-w-4xl">
+  <video id="rv" controls preload="metadata" class="w-full bg-black rounded"></video>
+  <div id="strip" class="relative h-4 bg-bg rounded mt-1"></div>
+  <div class="flex flex-wrap gap-2 items-center mt-2 text-xs">
+   <button type="button" class="btn btn-o" onclick="skip(-5)">⏪ 5 dtk</button><button type="button" class="btn btn-o" onclick="skip(5)">5 dtk ⏩</button>
+   <label class="text-gray-400">Kecepatan <select id="spd" onchange="rv.playbackRate=+this.value"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option></select></label>
+   <span class="text-gray-500">Klik penanda warna di bawah video atau baris event untuk lompat ke kejadian.</span></div>
+  <div id="evl" class="mt-2 max-h-48 overflow-y-auto text-xs"></div></div>
+ <div id="pvm" class="text-sm text-gray-500">Belum ada job. Unggah video untuk melihat pratinjau.</div></div>
+<div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr><th>File</th><th>Kamera</th><th>Mulai</th><th>Status</th><th>Progres</th><th>Event</th><th>Catatan</th><th></th></tr></thead><tbody id="jobs"></tbody></table></div>
+{% endblock %}
+{% block scripts %}<script>
+const colr={queued:'text-gray-400',processing:'text-amber-300',cancelling:'text-amber-300',cancelled:'text-gray-400',done:'text-emerald-400',failed:'text-red-400'};
+let J=[],sel=null,manual=false,shown=null,EV=[];const $=i=>document.getElementById(i),rv=$('rv');
+const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+function show(id){sel=id;manual=true;shown=null;tick()}
+function seek(t){rv.currentTime=Math.max(0,t-4);rv.play()}
+function skip(d){rv.currentTime=Math.max(0,Math.min(rv.duration||1e9,rv.currentTime+d))}
+function drawStrip(){const d=rv.duration;if(!d||!isFinite(d))return;$('strip').innerHTML=EV.map(e=>`<div onclick="seek(${e.t})" title="${fmt(e.t)} · ${e.pkji} ${e.speed} km/j" class="absolute top-0 h-4 w-1.5 rounded-sm cursor-pointer ${e.status=='watchlist'?'bg-red-500':e.status=='speeding'?'bg-amber-400':'bg-cyan-400'}" style="left:${Math.min(e.t/d*100,99.5)}%"></div>`).join('')}
+async function loadEv(){EV=await (await fetch(`/api/v1/videos/${sel}/events`)).json();drawStrip();
+ $('evl').innerHTML=EV.map(e=>`<div class="py-1 border-t border-line cursor-pointer hover:text-brand" onclick="seek(${e.t})">${fmt(e.t)} · ${e.pkji} · ${e.speed} km/j · <span class="font-mono">${e.plate}</span>${e.status!='normal'?' · '+e.status:''}</div>`).join('')||'<div class="text-gray-500">Tidak ada event pada job ini.</div>'}
+rv.onloadedmetadata=drawStrip;
+async function load(){J=await (await fetch('/api/v1/videos/jobs')).json();
+ if(sel!==null&&!J.find(x=>x.id==sel)){sel=null;manual=false;shown=null;rv.pause();rv.removeAttribute('src');rv.dataset.job='';$('rbox').classList.add('hidden');$('pv').classList.add('hidden');$('pvm').textContent='Belum ada job. Unggah video untuk melihat pratinjau.'}
+ const run=J.find(x=>x.status=='processing');if(run&&!manual)sel=run.id;else if(sel===null&&J.length)sel=J[0].id;
+ $('jobs').innerHTML=J.map(x=>{const busy=['processing','cancelling'].includes(x.status);return `<tr class="${x.id==sel?'bg-black/5':''}"><td>${x.filename}</td><td>${x.camera_id}</td><td>${x.started.replace('T',' ')}</td><td class="${colr[x.status]}">${x.status}</td>
+ <td><div class="w-24 h-2 bg-bg rounded-full overflow-hidden"><div class="h-full bg-brand" style="width:${x.progress}%"></div></div></td><td>${x.events}</td>
+ <td class="text-xs text-gray-400 max-w-md">${x.message||''}</td>
+ <td class="whitespace-nowrap space-x-2"><button class="text-brand text-xs" onclick="show(${x.id})">${x.replay?'Tonton':'Pratinjau'}</button>
+ ${x.status=='done'?`<a class="text-brand text-xs" href="/logs?date=${x.started.slice(0,10)}">Log</a>`:''}
+ ${['queued','processing'].includes(x.status)?`<form method="post" action="/videos/${x.id}/cancel" class="inline"><button class="text-amber-300 text-xs">Batalkan</button></form>`:''}
+ ${!busy?`<form method="post" action="/videos/${x.id}/delete" class="inline" onsubmit="return confirm('Hapus video, replay, DAN seluruh hasil deteksi dari job ini?')"><button class="text-red-400 text-xs">Hapus</button></form>`:''}</td></tr>`}).join('')||'<tr><td colspan=8 class="text-gray-500">Belum ada video</td></tr>';}
+function tick(){const j=J.find(x=>x.id==sel);if(!j)return;const live=['processing','cancelling'].includes(j.status);
+ $('pvt').textContent=`· ${j.filename} · ${j.status} ${j.progress}% · ${j.events} event`;
+ if(j.replay&&!live){if(rv.dataset.job!=sel){rv.dataset.job=sel;rv.src=`/videos/${sel}/replay.mp4`;loadEv()}
+  $('pv').classList.add('hidden');$('rbox').classList.remove('hidden');$('pvm').textContent='';return}
+ $('rbox').classList.add('hidden');if(!rv.paused)rv.pause();rv.dataset.job='';
+ if(!live&&shown===sel+':'+j.status)return;shown=sel+':'+j.status;
+ const im=new Image();im.onload=()=>{$('pv').src=im.src;$('pv').classList.remove('hidden');$('pvm').textContent=live?'':'Frame terakhir yang diproses (replay tidak tersedia untuk job ini).'};
+ im.onerror=()=>{if($('pv').classList.contains('hidden'))$('pvm').textContent='Pratinjau muncul setelah frame pertama diproses (hilang bila server di-restart).'};
+ im.src=`/api/v1/videos/${sel}/preview.jpg?t=${Date.now()}`}
+load();setInterval(load,2000);setInterval(tick,500);</script>{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Reports{% endblock %}{% block heading %}Generator Laporan{% endblock %}
+{% block content %}
+<form method="get" action="/reports/generate" class="card p-5 flex flex-wrap gap-3 items-end max-w-2xl">
+ <label class="text-xs text-gray-400">Periode<select name="days" class="block"><option value="1">24 jam</option><option value="7" selected>7 hari</option><option value="30">30 hari</option></select></label>
+ <label class="text-xs text-gray-400">Format<select name="fmt" class="block"><option value="xlsx">Excel (.xlsx)</option><option value="pdf">PDF</option></select></label>
+ <button class="btn">Generate</button></form>
+<p class="text-xs text-gray-500 mt-3">Laporan memuat ringkasan volume, pelanggaran, komposisi kelas PKJI, serta D_J, LOS, dan PHF jam puncak.</p>
+{% endblock %}

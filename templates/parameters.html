@@ -1,0 +1,65 @@
+{% extends "base.html" %}{% block title %}Parameter{% endblock %}{% block heading %}Parameter Sistem{% endblock %}
+{% block content %}
+{% macro nf(key, label, hint='', step='any') %}
+<label class="text-xs text-gray-400 block">{{ label }}
+ <input name="{{ key }}" type="number" step="{{ step }}" value="{{ ('%g' % P[key]) if P[key] is number else P[key] }}" class="w-full">
+ <span class="text-gray-500">{{ hint }}{{ ' · ' if hint }}default {{ ('%g' % D[key]) if D[key] is number else D[key] }}</span></label>
+{% endmacro %}
+{% macro actions(sec) %}
+<div class="flex gap-2 pt-1"><button class="btn">Simpan</button>
+ <button class="btn btn-o" formaction="/parameters/{{ sec }}/reset" formnovalidate onclick="return confirm('Kembalikan bagian ini ke nilai default?')">Kembalikan default</button></div>
+{% endmacro %}
+<p class="text-sm text-gray-400 mb-4 max-w-3xl">Nilai di sini berlaku untuk seluruh sistem. Lokasi bisa punya batas kecepatan dan parameter kapasitas sendiri di menu <a class="underline text-brand" href="/locations">Locations</a>.</p>
+<div class="grid xl:grid-cols-2 gap-4 max-w-6xl">
+
+<form method="post" action="/parameters/kecepatan" class="card p-4 space-y-3"><h2 class="text-base">Kecepatan</h2>
+ {{ nf('speed_limit', 'Batas kecepatan global (km/jam)', 'dipakai bila lokasi tidak punya batas sendiri') }}
+ {{ nf('speed_min', 'Batas stop-and-go (km/jam)', 'kendaraan lebih lambat tetap DIHITUNG sebagai volume, hanya diberi status macet dan dikeluarkan dari statistik kecepatan') }}
+ {{ nf('speed_max', 'Kecepatan maksimum valid (km/jam)', 'di atas ini dianggap salah ukur') }}{{ actions('kecepatan') }}</form>
+
+<form method="post" action="/parameters/kelas" class="card p-4 space-y-3"><h2 class="text-base">Kelas kendaraan PKJI</h2>
+ <p class="text-xs text-gray-500">Kelas terikat pada model AI (kode baku PKJI 2023), jadi tidak bisa ditambah atau dihapus. Hanya nama tampilan yang bisa diubah. Nilai emp <b>dinamis</b> (tabel di bawah), dipilih otomatis dari tipe jalan, total arus Q, dan lebar jalur.</p>
+ <table class="w-full text-sm"><thead><tr><th>Kode</th><th>Nama</th></tr></thead><tbody>
+ {% for c in codes %}<tr><td class="font-mono">{{ c }}</td><td><input name="lbl_{{ c }}" value="{{ P['lbl_' ~ c] }}" class="w-full"></td></tr>{% endfor %}</tbody></table>{{ actions('kelas') }}
+ {% set t = EMP.road_type_2_2_TT %}{% set lo = t.emp_table.Q_below_1800 %}{% set hi = t.emp_table.Q_above_1800 %}{% set dv = EMP.road_type_divided %}{% set dl = dv.emp_table.Q_below_1050 %}{% set dh = dv.emp_table.Q_above_1050 %}
+ <h3 class="text-sm font-semibold pt-2">Tabel emp dinamis (Jalan Perkotaan)</h3>
+ <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr><th>Tipe jalan / kondisi</th><th>MP</th><th>KS</th><th>LB</th><th>LT</th><th>SM</th></tr></thead><tbody>
+  <tr><td>2/2-TT, Q &lt; {{ t.low_volume_threshold_q }} kend/jam (total 2 arah)</td><td>{{ lo.MP }}</td><td>{{ lo.KS }}</td><td>{{ lo.LB }}</td><td>{{ lo.LT }}</td><td>{{ lo.SM_narrow_lane }} (lebar jalur ≤ 6 m) · {{ lo.SM_wide_lane }} (&gt; 6 m)</td></tr>
+  <tr><td>2/2-TT, Q ≥ {{ t.low_volume_threshold_q }} kend/jam</td><td>{{ hi.MP }}</td><td>{{ hi.KS }}</td><td>{{ hi.LB }}</td><td>{{ hi.LT }}</td><td>{{ hi.SM_narrow_lane }} (≤ 6 m) · {{ hi.SM_wide_lane }} (&gt; 6 m)</td></tr>
+  <tr><td>4/2-T, 6/2-T, Q/lajur &lt; {{ dv.threshold_q_per_lane }} kend/jam</td><td>{{ dl.MP }}</td><td>{{ dl.KS }}</td><td>{{ dl.LB }}</td><td>{{ dl.LT }}</td><td>{{ dl.SM }}</td></tr>
+  <tr><td>4/2-T, 6/2-T, Q/lajur ≥ {{ dv.threshold_q_per_lane }} kend/jam</td><td>{{ dh.MP }}</td><td>{{ dh.KS }}</td><td>{{ dh.LB }}</td><td>{{ dh.LT }}</td><td>{{ dh.SM }}</td></tr></tbody></table></div>
+ <p class="text-xs text-gray-500">emp SM turun saat arus naik (sesuai PKJI 2023). LB dan LT memakai nilai KS karena tabel PKJI hanya memuat KS dan SM; ubah di <span class="font-mono">configs/pkji_2023.json</span> bila perlu.</p>
+ <p class="text-xs text-gray-500">Tabel dibaca dari <span class="font-mono">configs/pkji_2023.json</span>.</p></form>
+
+<form method="post" action="/parameters/kapasitas" class="card p-4 space-y-3"><h2 class="text-base">Kapasitas jalan (default)</h2>
+ <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+  <label class="text-xs text-gray-400 block">Tipe jalan<select name="road_type" class="w-full">{% for t in C0 %}<option {{ 'selected' if P.road_type == t }}>{{ t }}</option>{% endfor %}</select><span class="text-gray-500">C0 = {% for t, v in C0.items() %}{{ t }}: {{ v }}{{ ', ' if not loop.last }}{% endfor %} smp/jam (terbagi: per lajur) · default {{ D.road_type }}</span></label>
+  {{ nf('lane_width', 'Lebar lajur (m)', 'F_CLJ terbagi: 3,0→0,92 · 3,5→1,00 · 4,0→1,08. 2/2-TT memakai lebar jalur (lajur × 2): 6 m→0,87 · 7 m→1,00 · 8 m→1,14') }}
+  <label class="text-xs text-gray-400 block">Pemisahan arah<select name="split" class="w-full">{% for x in ['50-50','60-40','70-30'] %}<option {{ 'selected' if P.split == x }}>{{ x }}</option>{% endfor %}</select><span class="text-gray-500">F_CPA: 1,00 · 0,94 · 0,88 (jalan terbagi selalu 1,00) · default {{ D.split }}</span></label>
+  <label class="text-xs text-gray-400 block">KHS (hambatan samping)<select name="khs" class="w-full">{% for x,l in [('VLO','VLO sangat rendah <100'),('LO','LO rendah 100–299'),('MD','MD sedang 300–499'),('HI','HI tinggi 500–899'),('VHI','VHI sangat tinggi ≥900')] %}<option value="{{ x }}" {{ 'selected' if P.khs == x }}>{{ l }}</option>{% endfor %}</select><span class="text-gray-500">default {{ D.khs }}</span></label>
+  <label class="text-xs text-gray-400 block">Lebar bahu efektif (m)<select name="lbe" class="w-full">{% for x in ['0.5','1.0','1.5','2.0'] %}<option {{ 'selected' if P.lbe == x }}>{{ x }}</option>{% endfor %}</select><span class="text-gray-500">0,5 berarti ≤ 0,5 · default {{ D.lbe }}</span></label>
+  {{ nf('f_chs', 'F_CHS manual', '0 = otomatis dari KHS + bahu (hanya 2/2-TT berbahu). Isi manual untuk jalan berkereb atau terbagi; kosong/0 pada jalan terbagi dipakai 1,00') }}
+  {{ nf('city_pop', 'Ukuran kota (juta jiwa)', 'F_CUK: <0,1 → 0,86 · 0,1–0,5 → 0,90 · 0,5–1,0 → 0,94 · 1–3 → 1,00 · >3 → 1,04') }}</div>
+ <p class="text-xs text-gray-500">C = C0 × F_CLJ × F_CPA × F_CHS × F_CUK [smp/jam]; D_J = Q(smp/jam) ÷ C. Jalan terbagi dianalisis per arah: C0 (1700/lajur) dikali jumlah lajur satu arah; arah ditentukan otomatis dari urutan lintas garis A→B (Arah 1) atau B→A (Arah 2).</p>
+ <h3 class="text-sm font-semibold pt-1">Batas atas D_J (derajat kejenuhan) per LOS</h3>
+ <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">{% for x in ['a','b','c','d','e'] %}{{ nf('los_' ~ x, 'LOS ' ~ x|upper) }}{% endfor %}</div>
+ <p class="text-xs text-gray-500">Di atas batas LOS E dinyatakan LOS F. D_J &gt; 0,85 ditandai merah (jenuh / tidak laik). Nilainya harus naik berurutan.</p>{{ actions('kapasitas') }}</form>
+
+<form method="post" action="/parameters/deteksi" class="card p-4 space-y-3"><h2 class="text-base">Deteksi & pelacakan</h2>
+ <div class="grid grid-cols-2 gap-3">
+  {{ nf('conf', 'Confidence', 'turunkan bila motor sering terlewat') }}{{ nf('iou', 'IoU', 'tumpang tindih kotak') }}
+  {{ nf('imgsz', 'Ukuran gambar (px)', 'naikkan untuk kendaraan kecil/jauh; lebih lambat', 32) }}
+  <label class="text-xs text-gray-400 block">Perangkat<select name="device" class="w-full">{% for d in ['auto','cpu','0','1'] %}<option {{ 'selected' if P.device == d }}>{{ d }}</option>{% endfor %}</select><span class="text-gray-500">auto = GPU bila ada · default {{ D.device }}</span></label>
+  {{ nf('track_buffer', 'Track buffer (frame)', 'naikkan agar ID bertahan saat tertutup', 1) }}{{ nf('match_thresh', 'Match threshold', 'lebih tinggi = lebih ketat') }}{{ nf('track_high_thresh', 'Track high threshold') }}
+  <label class="text-xs text-gray-400 flex items-center gap-2 mt-5"><input type="checkbox" name="half" {{ 'checked' if P.half }}> Gunakan FP16 (hanya jika GPU CUDA)</label></div>
+ <p class="text-xs text-gray-500">Perubahan di bagian ini berlaku setelah klik <b>Reload AI Engine</b> di Settings.</p>{{ actions('deteksi') }}</form>
+
+<form method="post" action="/parameters/anpr" class="card p-4 space-y-3"><h2 class="text-base">Pembaca plat (ANPR)</h2>
+ {{ nf('anpr_conf', 'Ambang kepercayaan', 'di bawah ini dicatat "TIDAK TERBACA"') }}
+ {{ nf('plate_every', 'OCR tiap N frame', 'lebih kecil = lebih sering, lebih berat', 1) }}
+ {{ nf('plate_max_tries', 'Maksimum percobaan per kendaraan', '', 1) }}
+ {{ nf('plate_min_width', 'Lebar minimum kendaraan (px)', 'lebih kecil dari ini tidak dibaca', 1) }}
+ <p class="text-xs text-gray-500">Berlaku untuk job video yang dimulai setelah disimpan.</p>{{ actions('anpr') }}</form>
+
+</div>
+{% endblock %}

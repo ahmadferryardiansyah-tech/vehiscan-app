@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}VehiScan{% endblock %} · VehiScan ITS Enterprise</title>
+{% if vendor %}<script src="/static/vendor/tailwind.js"></script>
+<script src="/static/vendor/chart.umd.min.js"></script>
+{% else %}<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>{% endif %}
+<script>tailwind.config={theme:{extend:{colors:{
+ paper:'#F3F5F4',sheet:'#FFFFFF',ink:'#1B2026',rule:'#D4DADD',marka:'#F6BD00',bp:'#2A5B88',
+ bg:'#F3F5F4',panel:'#FFFFFF',line:'#D4DADD',brand:'#2A5B88',
+ gray:{200:'#1B2026',300:'#343C44',400:'#5A646E',500:'#74808A',600:'#98A1A8'},
+ emerald:{300:'#1F8A5B',400:'#1F8A5B',500:'#1F8A5B'},red:{300:'#B93434',400:'#B93434',500:'#C23B3B'},
+ amber:{300:'#8F5F00',400:'#E0A800',500:'#B7791F'},cyan:{400:'#2A5B88'}}}}}</script>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+{% set groups = [
+ ('Pantau', [('/','Overview'),('/notifications','Notifications')]),
+ ('Analisis', [('/videos','Video Analysis'),('/logs','Vehicle Logs'),('/corridor','Corridor'),('/watchlist','Watchlist'),('/reports','Reports')]),
+ ('Kelola', [('/calibration','Calibration'),('/cameras','Cameras'),('/locations','Locations'),('/parameters','Parameter'),('/settings','Settings')])] %}
+{% set cur = namespace(g=groups[0]) %}
+{% for g in groups %}{% for href,label in g[1] %}{% if href == active %}{% set cur.g = g %}{% endif %}{% endfor %}{% endfor %}
+<header class="hd">
+ <div class="bar">
+  <a href="/" class="brand" aria-label="VehiScan ITS, ke halaman Overview"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><span class="word">VehiScan</span><span class="tag">ITS Enterprise</span></a>
+  <nav class="groups" aria-label="Kelompok menu">{% for g in groups %}<a href="{{ g[1][0][0] }}" class="{{ 'on' if g[0]==cur.g[0] }}">{{ g[0] }}</a>{% endfor %}</nav>
+  <div class="status"><i aria-hidden="true"></i>Diproses lokal, tanpa cloud</div>
+ </div>
+</header>
+<nav class="sn" aria-label="Halaman {{ cur.g[0] }}">{% for href,label in cur.g[1] %}<a href="{{ href }}" class="{{ 'on' if href==active }}" {% if href==active %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+<main class="page"><h1 class="text-2xl mb-5">{% block heading %}{% endblock %}</h1>
+{% if request.query_params.get('ok') %}<div class="notice ok" role="status">{{ request.query_params.get('ok') }}</div>{% endif %}
+{% if request.query_params.get('bad') %}<div class="notice bad" role="alert">{{ request.query_params.get('bad') }}</div>{% endif %}{% block content %}{% endblock %}</main>
+<script src="/static/js/crud.js"></script>
+{% block scripts %}{% endblock %}
+</body></html>
