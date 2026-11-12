@@ -11,3 +11,4 @@ ultralytics          # YOLO11 + ByteTrack (membawa PyTorch). GPU NVIDIA: pasang 
 rapidocr-onnxruntime # OCR plat nomor (opsional: tanpa ini aplikasi tetap jalan, plat tercatat "TIDAK TERBACA")
 imageio-ffmpeg       # ffmpeg bawaan untuk video replay beranotasi (H.264)
 # httpx              # hanya untuk: python tests/smoke_test.py
+gradio
