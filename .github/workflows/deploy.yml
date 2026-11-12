@@ -1,0 +1,22 @@
+name: Build VehiScan Image
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: vehiscanacr15753.azurecr.io
+          username: vehiscanacr15753
+          password: ${{ secrets.ACR_PASSWORD }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: vehiscanacr15753.azurecr.io/vehiscan-app:v1
